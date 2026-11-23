@@ -15,10 +15,33 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. CSS Tema Gelap Industri + Responsif Mobile
+# 2. CSS Tema Gelap Industri (Kontras Tinggi & Aman di Light/Dark Browser)
 st.markdown("""
 <style>
-    .stApp { background-color: #0b1120; color: #f8fafc; }
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+        background-color: #0b1120 !important;
+        color: #f8fafc !important;
+    }
+    .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stMarkdown {
+        color: #f8fafc !important;
+    }
+    /* Perbaiki warna tombol agar teks selalu kontras */
+    .stButton > button {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+        border: 1px solid #475569 !important;
+        font-weight: 600 !important;
+    }
+    .stButton > button:hover {
+        border-color: #38bdf8 !important;
+        background-color: #334155 !important;
+    }
+    /* Perbaiki Expander & Tabs */
+    [data-testid="stExpander"] {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+        border-radius: 10px !important;
+    }
     .block-container {
         padding-top: 1.5rem !important;
         padding-bottom: 2rem !important;
@@ -26,19 +49,19 @@ st.markdown("""
         padding-right: 1rem !important;
     }
     .header-box {
-        background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
-        border: 1px solid #334155;
+        background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%) !important;
+        border: 1px solid #334155 !important;
         border-radius: 12px;
         padding: 16px 20px;
         margin-bottom: 14px;
     }
-    .header-title { font-size: 22px; font-weight: 800; color: #f8fafc; margin: 0; line-height: 1.25; }
-    .header-sub { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+    .header-title { font-size: 22px; font-weight: 800; color: #f8fafc !important; margin: 0; line-height: 1.25; }
+    .header-sub { font-size: 13px; color: #cbd5e1 !important; margin-top: 6px; }
     .status-badge {
         display: inline-block;
-        background-color: rgba(16, 185, 129, 0.15);
-        color: #34d399;
-        border: 1px solid #059669;
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        color: #34d399 !important;
+        border: 1px solid #059669 !important;
         padding: 3px 10px;
         border-radius: 20px;
         font-size: 11px;
@@ -46,15 +69,15 @@ st.markdown("""
         margin-bottom: 8px;
     }
     .metric-card {
-        background-color: #1e293b;
+        background-color: #1e293b !important;
         border-radius: 10px;
         padding: 16px 18px;
         border-left: 6px solid #38bdf8;
         margin-bottom: 10px;
     }
-    .card-label { font-size: 11.5px; color: #94a3b8; font-weight: 700; }
+    .card-label { font-size: 11.5px; color: #cbd5e1 !important; font-weight: 700; }
     .card-value { font-size: 24px; font-weight: 800; margin: 4px 0; }
-    .card-sub { font-size: 12.5px; color: #e2e8f0; }
+    .card-sub { font-size: 12.5px; color: #f1f5f9 !important; }
 
     @media (max-width: 768px) {
         .header-title { font-size: 17px; }
@@ -109,7 +132,6 @@ status_info = {
     'Berbahaya': ('#c084fc', 'DARURAT LINGKUNGAN — Kondisi kritis, evakuasi / proteksi pernapasan wajib.')
 }
 
-# Inisialisasi State Slider
 for i, col in enumerate(fitur_sensor):
     if f"sl_{i}" not in st.session_state:
         st.session_state[f"sl_{i}"] = float(X_train[col].median())
@@ -117,7 +139,6 @@ for i, col in enumerate(fitur_sensor):
 if "sample_info" not in st.session_state:
     st.session_state["sample_info"] = ""
 
-# Fungsi Callback untuk Tombol Skenario Otomatis (Memperbaiki masalah tombol tidak merespons)
 def set_preset(values_list, info_msg=""):
     for i, val in enumerate(values_list):
         min_v = float(X_train[fitur_sensor[i]].min())
@@ -146,32 +167,16 @@ st.markdown(f"""
 st.markdown("**⚡ Pilih Skenario Simulasi Cepat:**")
 b1, b2, b3, b4 = st.columns(4)
 with b1:
-    st.button(
-        "🟢 Udara Bersih",
-        use_container_width=True,
-        on_click=set_preset,
-        args=([-1.15, -1.22, -1.10, -0.90, -1.32, -0.44, 0.0, 0.0, 0.5, 0.5], "Skenario Preset: Udara Bersih")
-    )
+    st.button("🟢 Udara Bersih", use_container_width=True, on_click=set_preset,
+              args=([-1.15, -1.22, -1.10, -0.90, -1.32, -0.44, 0.0, 0.0, 0.5, 0.5], "Skenario Preset: Udara Bersih"))
 with b2:
-    st.button(
-        "🟠 Polusi Tinggi",
-        use_container_width=True,
-        on_click=set_preset,
-        args=([0.80, 0.85, 0.50, 0.20, 0.60, 0.10, 0.5, -0.3, -0.5, -0.37], "Skenario Preset: Polusi Tinggi")
-    )
+    st.button("🟠 Polusi Tinggi", use_container_width=True, on_click=set_preset,
+              args=([0.80, 0.85, 0.50, 0.20, 0.60, 0.10, 0.5, -0.3, -0.5, -0.37], "Skenario Preset: Polusi Tinggi"))
 with b3:
-    st.button(
-        "🔴 Darurat Asap",
-        use_container_width=True,
-        on_click=set_preset,
-        args=([5.50, 5.30, 3.20, 0.30, -0.50, 0.05, 1.0, -0.5, -1.0, -0.37], "Skenario Preset: Darurat Asap")
-    )
+    st.button("🔴 Darurat Asap", use_container_width=True, on_click=set_preset,
+              args=([5.50, 5.30, 3.20, 0.30, -0.50, 0.05, 1.0, -0.5, -1.0, -0.37], "Skenario Preset: Darurat Asap"))
 with b4:
-    st.button(
-        "🎲 Uji Data Uji Acak",
-        use_container_width=True,
-        on_click=load_random_test_sample
-    )
+    st.button("🎲 Uji Data Uji Acak", use_container_width=True, on_click=load_random_test_sample)
 
 if st.session_state["sample_info"]:
     st.caption(st.session_state["sample_info"])
@@ -210,7 +215,7 @@ with c1:
     st.markdown(f"""
     <div class="metric-card" style="border-left-color: {col_rf};">
         <div class="card-label">PRIMARY ENGINE: RANDOM FOREST</div>
-        <div class="card-value" style="color:{col_rf};">{pred_rf.upper()}</div>
+        <div class="card-value" style="color:{col_rf} !important;">{pred_rf.upper()}</div>
         <div class="card-sub">Confidence Score: <b>{max_prob:.1f}%</b></div>
     </div>
     """, unsafe_allow_html=True)
@@ -218,12 +223,16 @@ with c2:
     st.markdown(f"""
     <div class="metric-card" style="border-left-color: {col_svm};">
         <div class="card-label">SECONDARY ENGINE: SVM (RBF KERNEL)</div>
-        <div class="card-value" style="color:{col_svm};">{pred_svm.upper()}</div>
+        <div class="card-value" style="color:{col_svm} !important;">{pred_svm.upper()}</div>
         <div class="card-sub">Margin Classifier Status: <b>Active</b></div>
     </div>
     """, unsafe_allow_html=True)
 
-st.info(f"**Rekomendasi Sistem:** {desc_rf}")
+st.markdown(f"""
+<div style="background-color:#0f172a; border:1px solid {col_rf}; border-radius:8px; padding:12px 16px; margin-bottom:14px; color:#f8fafc;">
+    <b>Rekomendasi Sistem:</b> {desc_rf}
+</div>
+""", unsafe_allow_html=True)
 
 # 9. Tab Fitur Utama & Tambahan
 tab1, tab2, tab3 = st.tabs(["📊 Grafik Telemetri Real-Time", "🧮 Konversi Satuan Fisik → Z-Score", "📥 Ekspor Log Data"])
@@ -239,7 +248,7 @@ with tab1:
             text=[f"{v:.1f}" for v in input_vals], textposition='outside'
         ))
         fig_s.update_layout(
-            title=dict(text="Profil Telemetri 10 Sensor (Z-Score)", font=dict(size=14)),
+            title=dict(text="Profil Telemetri 10 Sensor (Z-Score)", font=dict(size=14, color='#f8fafc')),
             paper_bgcolor='#0f172a', plot_bgcolor='#0f172a', font_color='#e2e8f0',
             height=310, margin=dict(l=25, r=15, t=45, b=35),
             yaxis=dict(range=[-3.8, 11.2], fixedrange=True),
@@ -257,7 +266,7 @@ with tab1:
             text=[f"{p:.1f}%" for p in nilai_p], textposition='outside'
         ))
         fig_p.update_layout(
-            title=dict(text="Probabilitas Random Forest (%)", font=dict(size=14)),
+            title=dict(text="Probabilitas Random Forest (%)", font=dict(size=14, color='#f8fafc')),
             paper_bgcolor='#0f172a', plot_bgcolor='#0f172a', font_color='#e2e8f0',
             height=310, margin=dict(l=75, r=35, t=45, b=35),
             xaxis=dict(range=[0, 122], fixedrange=True),
@@ -268,7 +277,6 @@ with tab1:
 with tab2:
     st.markdown("**Simulasi Kalibrasi Sensor Fisik Lapangan ke Skala Z-Score**")
     st.caption("Masukkan pembacaan asli sensor (satuan fisik), sistem akan menghitung rumus Z = (x - μ) / σ dan mengirimkannya ke dashboard.")
-    # Referensi rata-rata (mean) & standar deviasi (std) baku mutu udara perkotaan
     ref_stats = [
         ("PM2.5 (µg/m³)", 65.0, 45.0, 0.0, 500.0),
         ("PM10 (µg/m³)", 110.0, 70.0, 0.0, 600.0),
@@ -293,7 +301,7 @@ with tab2:
     def apply_converted():
         set_preset(z_converted, "🔄 Input berasal dari Konversi Sensor Fisik Lapangan")
 
-    st.button("🚀 Terapkan Hasil Konversi ke Diagnosis AI", on_click=apply_converted, type="primary")
+    st.button("🚀 Terapkan Hasil Konversi ke Diagnosis AI", on_click=apply_converted)
 
 with tab3:
     st.markdown("**Unduh Log Pembacaan Sensor & Hasil Diagnosis AI**")
