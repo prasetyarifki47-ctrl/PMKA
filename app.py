@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. CSS Tema Gelap Industri (Kontras Tinggi & Aman di Light/Dark Browser)
+# 2. CSS Tema Gelap Industri + Highlight Tab & Tombol Aktif
 st.markdown("""
 <style>
     .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
@@ -25,18 +25,40 @@ st.markdown("""
     .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stMarkdown {
         color: #f8fafc !important;
     }
-    /* Perbaiki warna tombol agar teks selalu kontras */
-    .stButton > button {
+    /* Tombol Menu Tidak Aktif (Default) */
+    .stButton > button[kind="secondary"] {
         background-color: #1e293b !important;
-        color: #f8fafc !important;
-        border: 1px solid #475569 !important;
+        color: #cbd5e1 !important;
+        border: 1px solid #334155 !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease;
+    }
+    .stButton > button[kind="secondary"]:hover {
+        border-color: #38bdf8 !important;
+        color: #ffffff !important;
+        background-color: #273549 !important;
+    }
+    /* Sorotan Tab Menu Aktif */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #0f172a;
+        padding: 6px;
+        border-radius: 10px;
+        border: 1px solid #1e293b;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        color: #94a3b8 !important;
         font-weight: 600 !important;
     }
-    .stButton > button:hover {
-        border-color: #38bdf8 !important;
-        background-color: #334155 !important;
+    .stTabs [aria-selected="true"] {
+        background-color: #0284c7 !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 10px rgba(2, 132, 199, 0.45) !important;
     }
-    /* Perbaiki Expander & Tabs */
+    /* Expander */
     [data-testid="stExpander"] {
         background-color: #1e293b !important;
         border: 1px solid #334155 !important;
@@ -137,20 +159,51 @@ for i, col in enumerate(fitur_sensor):
         st.session_state[f"sl_{i}"] = float(X_train[col].median())
 
 if "sample_info" not in st.session_state:
-    st.session_state["sample_info"] = ""
+    st.session_state["sample_info"] = "Mode: Nilai Median Sensor (Manual)"
 
-def set_preset(values_list, info_msg=""):
+if "active_mode" not in st.session_state:
+    st.session_state["active_mode"] = "manual"
+
+# CSS Dinamis untuk Mewarnai Tombol Skenario yang Sedang Aktif
+mode_colors = {
+    "bersih": ("#059669", "#10b981", "rgba(16, 185, 129, 0.45)"),
+    "polusi": ("#d97706", "#f59e0b", "rgba(245, 158, 11, 0.45)"),
+    "darurat": ("#dc2626", "#ef4444", "rgba(239, 68, 68, 0.45)"),
+    "acak": ("#7c3aed", "#a855f7", "rgba(168, 85, 247, 0.45)"),
+    "konversi": ("#0284c7", "#38bdf8", "rgba(56, 189, 248, 0.45)"),
+    "manual": ("#334155", "#64748b", "rgba(100, 116, 139, 0.3)")
+}
+bg_act, brd_act, shd_act = mode_colors.get(st.session_state["active_mode"], mode_colors["manual"])
+
+st.markdown(f"""
+<style>
+    .stButton > button[kind="primary"] {{
+        background-color: {bg_act} !important;
+        color: #ffffff !important;
+        border: 2px solid {brd_act} !important;
+        font-weight: 800 !important;
+        box-shadow: 0 0 14px {shd_act} !important;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+def set_preset(values_list, info_msg="", mode_key="manual"):
     for i, val in enumerate(values_list):
         min_v = float(X_train[fitur_sensor[i]].min())
         max_v = float(X_train[fitur_sensor[i]].max())
         st.session_state[f"sl_{i}"] = float(np.clip(val, min_v, max_v))
     st.session_state["sample_info"] = info_msg
+    st.session_state["active_mode"] = mode_key
 
 def load_random_test_sample():
     idx = np.random.randint(0, len(X_test))
     row_vals = X_test.iloc[idx].tolist()
     actual_lbl = label_kategori[int(y_test.iloc[idx])]
-    set_preset(row_vals, f"📌 Sampel Data Uji #{idx + 1} | Label Aktual Dataset: **{actual_lbl.upper()}**")
+    set_preset(row_vals, f"📌 Sampel Data Uji #{idx + 1} | Label Aktual Dataset: **{actual_lbl.upper()}**", "acak")
+
+def on_manual_slider():
+    st.session_state["active_mode"] = "manual"
+    st.session_state["sample_info"] = "🎛️ Mode: Penyesuaian Slider Manual"
 
 # 4. Header Responsif
 st.markdown(f"""
@@ -163,20 +216,41 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 5. Tombol Skenario Cepat + Uji Sampel Acak
+# 5. Tombol Skenario Cepat (Otomatis menyala berbeda saat aktif)
 st.markdown("**⚡ Pilih Skenario Simulasi Cepat:**")
+active_m = st.session_state["active_mode"]
 b1, b2, b3, b4 = st.columns(4)
 with b1:
-    st.button("🟢 Udara Bersih", use_container_width=True, on_click=set_preset,
-              args=([-1.15, -1.22, -1.10, -0.90, -1.32, -0.44, 0.0, 0.0, 0.5, 0.5], "Skenario Preset: Udara Bersih"))
+    st.button(
+        "🟢 Udara Bersih",
+        type="primary" if active_m == "bersih" else "secondary",
+        use_container_width=True,
+        on_click=set_preset,
+        args=([-1.15, -1.22, -1.10, -0.90, -1.32, -0.44, 0.0, 0.0, 0.5, 0.5], "🟢 Aktif: Skenario Preset Udara Bersih", "bersih")
+    )
 with b2:
-    st.button("🟠 Polusi Tinggi", use_container_width=True, on_click=set_preset,
-              args=([0.80, 0.85, 0.50, 0.20, 0.60, 0.10, 0.5, -0.3, -0.5, -0.37], "Skenario Preset: Polusi Tinggi"))
+    st.button(
+        "🟠 Polusi Tinggi",
+        type="primary" if active_m == "polusi" else "secondary",
+        use_container_width=True,
+        on_click=set_preset,
+        args=([0.80, 0.85, 0.50, 0.20, 0.60, 0.10, 0.5, -0.3, -0.5, -0.37], "🟠 Aktif: Skenario Preset Polusi Tinggi", "polusi")
+    )
 with b3:
-    st.button("🔴 Darurat Asap", use_container_width=True, on_click=set_preset,
-              args=([5.50, 5.30, 3.20, 0.30, -0.50, 0.05, 1.0, -0.5, -1.0, -0.37], "Skenario Preset: Darurat Asap"))
+    st.button(
+        "🔴 Darurat Asap",
+        type="primary" if active_m == "darurat" else "secondary",
+        use_container_width=True,
+        on_click=set_preset,
+        args=([5.50, 5.30, 3.20, 0.30, -0.50, 0.05, 1.0, -0.5, -1.0, -0.37], "🔴 Aktif: Skenario Preset Darurat Asap", "darurat")
+    )
 with b4:
-    st.button("🎲 Uji Data Uji Acak", use_container_width=True, on_click=load_random_test_sample)
+    st.button(
+        "🎲 Uji Data Uji Acak",
+        type="primary" if active_m == "acak" else "secondary",
+        use_container_width=True,
+        on_click=load_random_test_sample
+    )
 
 if st.session_state["sample_info"]:
     st.caption(st.session_state["sample_info"])
@@ -195,7 +269,8 @@ with st.expander("🎛️ Atur Manual Nilai 10 Sensor (Klik untuk Buka/Tutup)", 
                 min_value=float(X_train[col].min()),
                 max_value=float(X_train[col].max()),
                 step=0.05,
-                key=f"sl_{i}"
+                key=f"sl_{i}",
+                on_change=on_manual_slider
             )
             input_vals.append(val)
 
@@ -234,7 +309,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 9. Tab Fitur Utama & Tambahan
+# 9. Tab Fitur Utama & Tambahan (Tab aktif disorot biru terang)
 tab1, tab2, tab3 = st.tabs(["📊 Grafik Telemetri Real-Time", "🧮 Konversi Satuan Fisik → Z-Score", "📥 Ekspor Log Data"])
 
 with tab1:
@@ -299,9 +374,13 @@ with tab2:
             z_converted.append(z_val)
 
     def apply_converted():
-        set_preset(z_converted, "🔄 Input berasal dari Konversi Sensor Fisik Lapangan")
+        set_preset(z_converted, "🔄 Aktif: Hasil Konversi Sensor Fisik Lapangan", "konversi")
 
-    st.button("🚀 Terapkan Hasil Konversi ke Diagnosis AI", on_click=apply_converted)
+    st.button(
+        "🚀 Terapkan Hasil Konversi ke Diagnosis AI",
+        type="primary" if active_m == "konversi" else "secondary",
+        on_click=apply_converted
+    )
 
 with tab3:
     st.markdown("**Unduh Log Pembacaan Sensor & Hasil Diagnosis AI**")
