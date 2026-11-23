@@ -2,11 +2,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+from datetime import datetime
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 
-# 1. Konfigurasi Halaman Responsif (Sidebar otomatis tertutup saat dibuka di HP)
+# 1. Konfigurasi Halaman Responsif
 st.set_page_config(
     page_title="Air Quality Telemetry & AI Diagnostics",
     page_icon="🏭",
@@ -31,18 +32,8 @@ st.markdown("""
         padding: 16px 20px;
         margin-bottom: 14px;
     }
-    .header-title {
-        font-size: 22px;
-        font-weight: 800;
-        color: #f8fafc;
-        margin: 0;
-        line-height: 1.25;
-    }
-    .header-sub {
-        font-size: 13px;
-        color: #94a3b8;
-        margin-top: 6px;
-    }
+    .header-title { font-size: 22px; font-weight: 800; color: #f8fafc; margin: 0; line-height: 1.25; }
+    .header-sub { font-size: 13px; color: #94a3b8; margin-top: 6px; }
     .status-badge {
         display: inline-block;
         background-color: rgba(16, 185, 129, 0.15);
@@ -65,7 +56,6 @@ st.markdown("""
     .card-value { font-size: 24px; font-weight: 800; margin: 4px 0; }
     .card-sub { font-size: 12.5px; color: #e2e8f0; }
 
-    /* Penyesuaian khusus layar HP */
     @media (max-width: 768px) {
         .header-title { font-size: 17px; }
         .header-sub { font-size: 11.5px; }
@@ -89,7 +79,7 @@ def load_and_train():
     ]
 
     train_clean = train_df[fitur + ['Target_Encoded']].dropna()
-    test_clean = test_df[fitur + ['Target_Encoded']].dropna()
+    test_clean = test_df[fitur + ['Target_Encoded']].dropna().reset_index(drop=True)
 
     X_train, y_train = train_clean[fitur], train_clean['Target_Encoded'].astype(int)
     X_test, y_test = test_clean[fitur], test_clean['Target_Encoded'].astype(int)
@@ -99,9 +89,9 @@ def load_and_train():
 
     acc_rf = accuracy_score(y_test, rf.predict(X_test)) * 100
     acc_svm = accuracy_score(y_test, svm.predict(X_test)) * 100
-    return X_train, fitur, rf, svm, acc_rf, acc_svm
+    return X_train, X_test, y_test, fitur, rf, svm, acc_rf, acc_svm
 
-X_train, fitur_sensor, rf_model, svm_model, acc_rf, acc_svm = load_and_train()
+X_train, X_test, y_test, fitur_sensor, rf_model, svm_model, acc_rf, acc_svm = load_and_train()
 
 label_kategori = {
     0: 'Baik',
@@ -119,6 +109,28 @@ status_info = {
     'Berbahaya': ('#c084fc', 'DARURAT LINGKUNGAN — Kondisi kritis, evakuasi / proteksi pernapasan wajib.')
 }
 
+# Inisialisasi State Slider
+for i, col in enumerate(fitur_sensor):
+    if f"sl_{i}" not in st.session_state:
+        st.session_state[f"sl_{i}"] = float(X_train[col].median())
+
+if "sample_info" not in st.session_state:
+    st.session_state["sample_info"] = ""
+
+# Fungsi Callback untuk Tombol Skenario Otomatis (Memperbaiki masalah tombol tidak merespons)
+def set_preset(values_list, info_msg=""):
+    for i, val in enumerate(values_list):
+        min_v = float(X_train[fitur_sensor[i]].min())
+        max_v = float(X_train[fitur_sensor[i]].max())
+        st.session_state[f"sl_{i}"] = float(np.clip(val, min_v, max_v))
+    st.session_state["sample_info"] = info_msg
+
+def load_random_test_sample():
+    idx = np.random.randint(0, len(X_test))
+    row_vals = X_test.iloc[idx].tolist()
+    actual_lbl = label_kategori[int(y_test.iloc[idx])]
+    set_preset(row_vals, f"📌 Sampel Data Uji #{idx + 1} | Label Aktual Dataset: **{actual_lbl.upper()}**")
+
 # 4. Header Responsif
 st.markdown(f"""
 <div class="header-box">
@@ -130,23 +142,41 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 5. Tombol Skenario Cepat Langsung di Layar Utama (Ramah HP)
-if 'vals' not in st.session_state:
-    st.session_state.vals = [float(X_train[c].median()) for c in fitur_sensor]
-
+# 5. Tombol Skenario Cepat + Uji Sampel Acak
 st.markdown("**⚡ Pilih Skenario Simulasi Cepat:**")
-b1, b2, b3 = st.columns(3)
+b1, b2, b3, b4 = st.columns(4)
 with b1:
-    if st.button("🟢 Udara Bersih", use_container_width=True):
-        st.session_state.vals = [-1.15, -1.22, -1.10, -0.90, -1.32, -0.44, 0.0, 0.0, 0.5, 0.5]
+    st.button(
+        "🟢 Udara Bersih",
+        use_container_width=True,
+        on_click=set_preset,
+        args=([-1.15, -1.22, -1.10, -0.90, -1.32, -0.44, 0.0, 0.0, 0.5, 0.5], "Skenario Preset: Udara Bersih")
+    )
 with b2:
-    if st.button("🟠 Polusi Tinggi", use_container_width=True):
-        st.session_state.vals = [0.80, 0.85, 0.50, 0.20, 0.60, 0.10, 0.5, -0.3, -0.5, -0.37]
+    st.button(
+        "🟠 Polusi Tinggi",
+        use_container_width=True,
+        on_click=set_preset,
+        args=([0.80, 0.85, 0.50, 0.20, 0.60, 0.10, 0.5, -0.3, -0.5, -0.37], "Skenario Preset: Polusi Tinggi")
+    )
 with b3:
-    if st.button("🔴 Darurat Asap", use_container_width=True):
-        st.session_state.vals = [5.50, 5.30, 3.20, 0.30, -0.50, 0.05, 1.0, -0.5, -1.0, -0.37]
+    st.button(
+        "🔴 Darurat Asap",
+        use_container_width=True,
+        on_click=set_preset,
+        args=([5.50, 5.30, 3.20, 0.30, -0.50, 0.05, 1.0, -0.5, -1.0, -0.37], "Skenario Preset: Darurat Asap")
+    )
+with b4:
+    st.button(
+        "🎲 Uji Data Uji Acak",
+        use_container_width=True,
+        on_click=load_random_test_sample
+    )
 
-# 6. Kontrol 10 Sensor di dalam Expander (Bisa dibuka/tutup rapi di HP maupun Laptop)
+if st.session_state["sample_info"]:
+    st.caption(st.session_state["sample_info"])
+
+# 6. Kontrol 10 Sensor Manual
 label_map = ['PM2.5', 'PM10', 'Gas CO', 'Gas SO₂', 'Gas NO₂', 'Gas O₃', 'Suhu', 'Kelembapan', 'Angin', 'Hujan']
 input_vals = []
 
@@ -159,7 +189,6 @@ with st.expander("🎛️ Atur Manual Nilai 10 Sensor (Klik untuk Buka/Tutup)", 
                 f"{label_map[i]} (Z-score)",
                 min_value=float(X_train[col].min()),
                 max_value=float(X_train[col].max()),
-                value=float(st.session_state.vals[i]),
                 step=0.05,
                 key=f"sl_{i}"
             )
@@ -196,39 +225,89 @@ with c2:
 
 st.info(f"**Rekomendasi Sistem:** {desc_rf}")
 
-# 9. Grafik Interaktif Responsif (Gesture zoom/pan dinonaktifkan agar scroll HP tidak nyangkut)
-g1, g2 = st.columns([1.3, 1])
-plot_cfg = {'displayModeBar': False}
+# 9. Tab Fitur Utama & Tambahan
+tab1, tab2, tab3 = st.tabs(["📊 Grafik Telemetri Real-Time", "🧮 Konversi Satuan Fisik → Z-Score", "📥 Ekspor Log Data"])
 
-with g1:
-    colors_bar = ['#ef4444' if (i < 6 and v > 2.5) else '#f59e0b' if (i < 6 and v > 0.4) else '#38bdf8' if i < 6 else '#2dd4bf' for i, v in enumerate(input_vals)]
-    fig_s = go.Figure(go.Bar(
-        x=label_map, y=input_vals, marker_color=colors_bar,
-        text=[f"{v:.1f}" for v in input_vals], textposition='outside'
-    ))
-    fig_s.update_layout(
-        title=dict(text="Profil Telemetri 10 Sensor (Z-Score)", font=dict(size=14)),
-        paper_bgcolor='#0f172a', plot_bgcolor='#0f172a', font_color='#e2e8f0',
-        height=310, margin=dict(l=25, r=15, t=45, b=35),
-        yaxis=dict(range=[-3.8, 11.2], fixedrange=True),
-        xaxis=dict(fixedrange=True)
-    )
-    st.plotly_chart(fig_s, use_container_width=True, config=plot_cfg)
+with tab1:
+    g1, g2 = st.columns([1.3, 1])
+    plot_cfg = {'displayModeBar': False}
 
-with g2:
-    urutan = [0, 3, 4, 2, 1]
-    nama_k = ['Baik', 'Sedang', 'Tidak Sehat', 'Sangat TS', 'Berbahaya']
-    nilai_p = [probs_rf[k] for k in urutan]
-    warna_k = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#c084fc']
-    fig_p = go.Figure(go.Bar(
-        x=nilai_p, y=nama_k, orientation='h', marker_color=warna_k,
-        text=[f"{p:.1f}%" for p in nilai_p], textposition='outside'
-    ))
-    fig_p.update_layout(
-        title=dict(text="Probabilitas Random Forest (%)", font=dict(size=14)),
-        paper_bgcolor='#0f172a', plot_bgcolor='#0f172a', font_color='#e2e8f0',
-        height=310, margin=dict(l=75, r=35, t=45, b=35),
-        xaxis=dict(range=[0, 122], fixedrange=True),
-        yaxis=dict(autorange='reversed', fixedrange=True)
+    with g1:
+        colors_bar = ['#ef4444' if (i < 6 and v > 2.5) else '#f59e0b' if (i < 6 and v > 0.4) else '#38bdf8' if i < 6 else '#2dd4bf' for i, v in enumerate(input_vals)]
+        fig_s = go.Figure(go.Bar(
+            x=label_map, y=input_vals, marker_color=colors_bar,
+            text=[f"{v:.1f}" for v in input_vals], textposition='outside'
+        ))
+        fig_s.update_layout(
+            title=dict(text="Profil Telemetri 10 Sensor (Z-Score)", font=dict(size=14)),
+            paper_bgcolor='#0f172a', plot_bgcolor='#0f172a', font_color='#e2e8f0',
+            height=310, margin=dict(l=25, r=15, t=45, b=35),
+            yaxis=dict(range=[-3.8, 11.2], fixedrange=True),
+            xaxis=dict(fixedrange=True)
+        )
+        st.plotly_chart(fig_s, use_container_width=True, config=plot_cfg)
+
+    with g2:
+        urutan = [0, 3, 4, 2, 1]
+        nama_k = ['Baik', 'Sedang', 'Tidak Sehat', 'Sangat TS', 'Berbahaya']
+        nilai_p = [probs_rf[k] for k in urutan]
+        warna_k = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#c084fc']
+        fig_p = go.Figure(go.Bar(
+            x=nilai_p, y=nama_k, orientation='h', marker_color=warna_k,
+            text=[f"{p:.1f}%" for p in nilai_p], textposition='outside'
+        ))
+        fig_p.update_layout(
+            title=dict(text="Probabilitas Random Forest (%)", font=dict(size=14)),
+            paper_bgcolor='#0f172a', plot_bgcolor='#0f172a', font_color='#e2e8f0',
+            height=310, margin=dict(l=75, r=35, t=45, b=35),
+            xaxis=dict(range=[0, 122], fixedrange=True),
+            yaxis=dict(autorange='reversed', fixedrange=True)
+        )
+        st.plotly_chart(fig_p, use_container_width=True, config=plot_cfg)
+
+with tab2:
+    st.markdown("**Simulasi Kalibrasi Sensor Fisik Lapangan ke Skala Z-Score**")
+    st.caption("Masukkan pembacaan asli sensor (satuan fisik), sistem akan menghitung rumus Z = (x - μ) / σ dan mengirimkannya ke dashboard.")
+    # Referensi rata-rata (mean) & standar deviasi (std) baku mutu udara perkotaan
+    ref_stats = [
+        ("PM2.5 (µg/m³)", 65.0, 45.0, 0.0, 500.0),
+        ("PM10 (µg/m³)", 110.0, 70.0, 0.0, 600.0),
+        ("Gas CO (µg/m³)", 1200.0, 800.0, 0.0, 10000.0),
+        ("Gas SO₂ (µg/m³)", 45.0, 35.0, 0.0, 500.0),
+        ("Gas NO₂ (µg/m³)", 55.0, 40.0, 0.0, 400.0),
+        ("Gas O₃ (µg/m³)", 70.0, 45.0, 0.0, 400.0),
+        ("Suhu (°C)", 28.0, 4.5, 10.0, 45.0),
+        ("Kelembapan (%)", 72.0, 15.0, 20.0, 100.0),
+        ("Kec. Angin (km/h)", 12.0, 6.0, 0.0, 60.0),
+        ("Curah Hujan (mm)", 2.5, 6.5, 0.0, 100.0),
+    ]
+    rc1, rc2 = st.columns(2)
+    z_converted = []
+    for i, (r_lbl, r_mean, r_std, r_min, r_max) in enumerate(ref_stats):
+        target_rc = rc1 if i < 5 else rc2
+        with target_rc:
+            phys_val = st.number_input(r_lbl, min_value=r_min, max_value=r_max, value=r_mean, key=f"phys_{i}")
+            z_val = (phys_val - r_mean) / r_std
+            z_converted.append(z_val)
+
+    def apply_converted():
+        set_preset(z_converted, "🔄 Input berasal dari Konversi Sensor Fisik Lapangan")
+
+    st.button("🚀 Terapkan Hasil Konversi ke Diagnosis AI", on_click=apply_converted, type="primary")
+
+with tab3:
+    st.markdown("**Unduh Log Pembacaan Sensor & Hasil Diagnosis AI**")
+    log_df = df_in.copy()
+    log_df.insert(0, 'Timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    log_df['Prediksi_Random_Forest'] = pred_rf
+    log_df['Confidence_RF_Pct'] = round(max_prob, 2)
+    log_df['Prediksi_SVM'] = pred_svm
+
+    st.dataframe(log_df, use_container_width=True)
+    csv_bytes = log_df.to_csv(index=False, sep=';').encode('utf-8')
+    st.download_button(
+        label="📥 Download Laporan Log (.CSV)",
+        data=csv_bytes,
+        file_name=f"Log_Kualitas_Udara_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
     )
-    st.plotly_chart(fig_p, use_container_width=True, config=plot_cfg)
